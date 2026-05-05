@@ -3,11 +3,9 @@ services:
     name: resume-analyzer-backend
     runtime: python
     rootDir: backend
-    pythonVersion: "3.11.9"
-    buildCommand: |
-      pip install --upgrade pip
-      pip install torch --index-url https://download.pytorch.org/whl/cpu
-      pip install fastapi==0.111.0 uvicorn==0.30.1 transformers==4.41.2 pdfplumber==0.11.0 python-docx==1.1.2 pydantic==2.7.3 httpx==0.27.0 python-multipart==0.0.9 spacy==3.7.4
-      python -m spacy download en_core_web_sm
+    buildCommand: pip install --upgrade pip && pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -r requirements.txt && python -m spacy download en_core_web_sm
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
     healthCheckPath: /
