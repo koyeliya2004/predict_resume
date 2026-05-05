@@ -1,12 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Resume Analyzer</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resume Analyzer - AI Powered</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-blur-1"></div>
+  <div class="bg-blur-2"></div>
+
+  <header>
+    <div class="logo">
+      <span class="logo-icon">🧠</span>
+      <span class="logo-text">ResumeAI</span>
+    </div>
+    <nav>
+      <a href="#" class="nav-link">How it works</a>
+      <a href="#" class="nav-link">Features</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <div class="badge">Powered by BERT + spaCy NLP</div>
+      <h1>Analyze Your Resume <br/><span class="gradient-text">with AI Precision</span></h1>
+      <p class="hero-sub">Get instant feedback on skills, ATS score, role prediction, and actionable improvements based on real NLP analysis.</p>
+    </section>
+
+    <!-- Upload Section -->
+    <section class="upload-section">
+      <div class="tab-bar">
+        <button class="tab active" onclick="switchTab('file')">📁 Upload File</button>
+        <button class="tab" onclick="switchTab('text')">📝 Paste Text</button>
+      </div>
+
+      <!-- File Upload -->
+      <div id="tab-file" class="tab-content active">
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📄</div>
+          <div class="drop-text">Drag & drop your resume here</div>
+          <div class="drop-sub">Supports PDF, DOCX, TXT</div>
+          <label class="upload-btn">
+            Choose File
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt" hidden />
+          </label>
+          <div id="fileName" class="file-name"></div>
+        </div>
+      </div>
+
+      <!-- Text Input -->
+      <div id="tab-text" class="tab-content">
+        <textarea id="textInput" placeholder="Paste your full resume text here...\n\nInclude your skills, experience, education, and projects for best analysis."></textarea>
+      </div>
+
+      <button class="analyze-btn" onclick="analyzeResume()">Analyze Resume →</button>
+      <div id="loadingSpinner" class="spinner hidden"></div>
+      <div id="errorMsg" class="error-msg hidden"></div>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="results hidden">
+      <h2 class="results-title">Analysis Results</h2>
+
+      <!-- Score Cards -->
+      <div class="score-grid">
+        <div class="score-card">
+          <div class="score-label">Resume Score</div>
+          <div class="score-value" id="resumeScore">0</div>
+          <div class="score-bar"><div class="score-fill" id="resumeBar"></div></div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">ATS Score</div>
+          <div class="score-value" id="atsScore">0</div>
+          <div class="score-bar"><div class="score-fill ats" id="atsBar"></div></div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">Predicted Role</div>
+          <div class="score-role" id="predictedRole">-</div>
+        </div>
+        <div class="score-card">
+          <div class="score-label">Word Count</div>
+          <div class="score-role" id="wordCount">-</div>
+        </div>
+      </div>
+
+      <!-- Name & Contact -->
+      <div class="info-card">
+        <h3>👤 Candidate Info</h3>
+        <div class="info-grid" id="contactInfo"></div>
+      </div>
+
+      <!-- Skills by Category -->
+      <div class="info-card">
+        <h3>🛠️ Skills Detected</h3>
+        <div id="skillsGrid" class="skills-grid"></div>
+      </div>
+
+      <!-- Experience & Education -->
+      <div class="two-col">
+        <div class="info-card">
+          <h3>💼 Experience</h3>
+          <div id="experienceInfo" class="info-val"></div>
+        </div>
+        <div class="info-card">
+          <h3>🎓 Education</h3>
+          <div id="educationInfo" class="info-val"></div>
+        </div>
+      </div>
+
+      <!-- Suggestions -->
+      <div class="info-card">
+        <h3>💡 Improvement Suggestions</h3>
+        <div id="suggestionsList"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built with FastAPI + BERT + spaCy | <a href="https://github.com/koyeliya2004/predict_resume" target="_blank">GitHub</a></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
 </html>
