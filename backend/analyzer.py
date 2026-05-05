@@ -1,6 +1,5 @@
 import spacy
 import re
-from transformers import pipeline
 
 # Load spaCy model
 try:
@@ -10,10 +9,20 @@ except OSError:
     subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
     nlp = spacy.load("en_core_web_sm")
 
-# Pretrained HuggingFace NER pipeline
-ner_pipeline = pipeline("ner", model="dslim/bert-base-NER", grouped_entities=True)
+# Lazy-load BERT NER pipeline only when first used
+_ner_pipeline = None
 
-# Real tech skills database
+def get_ner_pipeline():
+    global _ner_pipeline
+    if _ner_pipeline is None:
+        try:
+            from transformers import pipeline
+            _ner_pipeline = pipeline("ner", model="dslim/bert-base-NER", grouped_entities=True)
+        except Exception:
+            _ner_pipeline = False  # mark as failed so we don't retry
+    return _ner_pipeline if _ner_pipeline else None
+
+
 SKILLS_DB = [
     "Python", "JavaScript", "TypeScript", "React", "Next.js", "Vue.js", "Angular",
     "Node.js", "Express.js", "FastAPI", "Flask", "Django", "Spring Boot",
@@ -32,11 +41,10 @@ SKILLS_DB = [
     "Figma", "Jira", "Agile", "Scrum"
 ]
 
-# Role prediction based on skill sets
 ROLE_RULES = [
     (["Machine Learning", "Deep Learning", "TensorFlow", "PyTorch", "Scikit-learn"], "ML/AI Engineer"),
     (["NLP", "NLTK", "spaCy", "Hugging Face", "LLM"], "NLP Engineer"),
-    (["Computer Vision", "OpenCV", "YOLO"], "Computer Vision Engineer"),
+    (["Computer Vision", "OpenCV"], "Computer Vision Engineer"),
     (["React", "Next.js", "Vue.js", "Angular", "HTML", "CSS", "Tailwind CSS"], "Frontend Developer"),
     (["Node.js", "FastAPI", "Flask", "Django", "Express.js", "Spring Boot"], "Backend Developer"),
     (["Docker", "Kubernetes", "CI/CD", "Terraform", "Jenkins", "AWS", "GCP", "Azure"], "DevOps/Cloud Engineer"),
@@ -55,12 +63,14 @@ SKILL_CATEGORIES = {
     "Tools": ["Git", "GitHub", "GitLab", "Jira", "Postman", "Figma", "Selenium", "Pytest", "Jest"],
 }
 
+
 def extract_skills(text):
     found = []
     for skill in SKILLS_DB:
         if re.search(r'\b' + re.escape(skill) + r'\b', text, re.IGNORECASE):
             found.append(skill)
     return list(set(found))
+
 
 def categorize_skills(skills):
     categorized = {}
@@ -69,6 +79,7 @@ def categorize_skills(skills):
         if matched:
             categorized[cat] = matched
     return categorized
+
 
 def extract_experience_years(text):
     patterns = [
@@ -82,6 +93,7 @@ def extract_experience_years(text):
         return max(int(m) for m in matches)
     return 0
 
+
 def extract_education(text):
     degrees = ["B.Tech", "B.E", "B.Sc", "M.Tech", "M.Sc", "MCA", "BCA", "MBA", "Ph.D", "Bachelor", "Master", "Doctorate"]
     found = []
@@ -90,21 +102,26 @@ def extract_education(text):
             found.append(deg)
     return list(set(found))
 
+
 def extract_email(text):
     match = re.search(r'[\w.+-]+@[\w-]+\.[\w.]+', text)
     return match.group(0) if match else None
+
 
 def extract_phone(text):
     match = re.search(r'(?:\+91[\s-]?)?[6-9]\d{9}|(?:\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s-]?\d{3}[\s-]?\d{4}', text)
     return match.group(0) if match else None
 
+
 def extract_github(text):
     match = re.search(r'github\.com/([\w-]+)', text, re.IGNORECASE)
     return f"github.com/{match.group(1)}" if match else None
 
+
 def extract_linkedin(text):
     match = re.search(r'linkedin\.com/in/([\w-]+)', text, re.IGNORECASE)
     return f"linkedin.com/in/{match.group(1)}" if match else None
+
 
 def predict_role(skills):
     best_role = "Software Developer"
@@ -116,41 +133,66 @@ def predict_role(skills):
             best_role = role
     return best_role
 
+
 def compute_score(skills, experience, education):
     score = 0
-    score += min(len(skills) * 3, 40)  # up to 40 pts for skills
-    score += min(experience * 5, 30)    # up to 30 pts for experience
-    score += 10 if education else 0     # 10 pts for education
+    score += min(len(skills) * 3, 40)
+    score += min(experience * 5, 30)
+    score += 10 if education else 0
     score += 5 if len(skills) > 10 else 0
     score += 5 if experience > 2 else 0
-    # Bonus for having diverse skills
     cats = categorize_skills(skills)
     score += min(len(cats) * 2, 10)
     return min(score, 100)
 
+
 def get_ats_score(text, skills):
-    # ATS scoring based on keyword density and formatting
     score = 0
     word_count = len(text.split())
-    if word_count > 200:
-        score += 20
-    if word_count > 400:
-        score += 10
+    if word_count > 200: score += 20
+    if word_count > 400: score += 10
     score += min(len(skills) * 2, 30)
-    if re.search(r'experience|work|employment', text, re.IGNORECASE):
-        score += 10
-    if re.search(r'education|degree|university|college', text, re.IGNORECASE):
-        score += 10
-    if re.search(r'project|portfolio|github', text, re.IGNORECASE):
-        score += 10
-    if re.search(r'achievement|award|certification', text, re.IGNORECASE):
-        score += 10
+    if re.search(r'experience|work|employment', text, re.IGNORECASE): score += 10
+    if re.search(r'education|degree|university|college', text, re.IGNORECASE): score += 10
+    if re.search(r'project|portfolio|github', text, re.IGNORECASE): score += 10
+    if re.search(r'achievement|award|certification', text, re.IGNORECASE): score += 10
     return min(score, 100)
+
+
+def match_job_description(resume_skills, jd_text):
+    """Compare resume skills against a job description."""
+    jd_skills = extract_skills(jd_text)
+    if not jd_skills:
+        return {"match_score": 0, "matched": [], "missing": [], "jd_skills": []}
+    matched = [s for s in jd_skills if s in resume_skills]
+    missing = [s for s in jd_skills if s not in resume_skills]
+    score = int((len(matched) / len(jd_skills)) * 100)
+    return {
+        "match_score": score,
+        "matched_skills": matched,
+        "missing_skills": missing,
+        "jd_skills_total": len(jd_skills),
+    }
+
+
+def get_section_checklist(text):
+    """Check which standard resume sections are present."""
+    sections = {
+        "Contact Info": bool(re.search(r'email|phone|linkedin|github|@', text, re.IGNORECASE)),
+        "Summary/Objective": bool(re.search(r'summary|objective|profile|about', text, re.IGNORECASE)),
+        "Skills": bool(re.search(r'skill|technologies|tech stack|tools', text, re.IGNORECASE)),
+        "Experience": bool(re.search(r'experience|work|employment|internship|intern', text, re.IGNORECASE)),
+        "Education": bool(re.search(r'education|degree|university|college|school|b\.tech|m\.tech|bca|mca', text, re.IGNORECASE)),
+        "Projects": bool(re.search(r'project|built|developed|created|implemented', text, re.IGNORECASE)),
+        "Certifications": bool(re.search(r'certification|certified|certificate|course', text, re.IGNORECASE)),
+        "Achievements": bool(re.search(r'achievement|award|honor|winner|rank|prize', text, re.IGNORECASE)),
+    }
+    return sections
+
 
 def suggest_improvements(skills, experience, education, text):
     suggestions = []
     skill_set = set(s.lower() for s in skills)
-
     if "docker" not in skill_set:
         suggestions.append({"type": "skill", "msg": "Add Docker for containerization knowledge"})
     if "git" not in skill_set:
@@ -171,20 +213,35 @@ def suggest_improvements(skills, experience, education, text):
         suggestions.append({"type": "link", "msg": "Add your LinkedIn profile for professional presence"})
     if not re.search(r'project', text, re.IGNORECASE):
         suggestions.append({"type": "content", "msg": "Include a Projects section with descriptions and tech used"})
+    if not re.search(r'certification|certified', text, re.IGNORECASE):
+        suggestions.append({"type": "content", "msg": "Add certifications (Coursera, Google, AWS, etc.) to stand out"})
     return suggestions
 
-def extract_name(text):
-    try:
-        entities = ner_pipeline(text[:512])
-        for ent in entities:
-            if ent["entity_group"] == "PER":
-                return ent["word"]
-    except Exception:
-        pass
-    first_line = text.strip().split('\n')[0].strip()
-    return first_line[:60] if first_line else "Unknown"
 
-def analyze_resume(text: str) -> dict:
+def extract_name(text):
+    ner = get_ner_pipeline()
+    if ner:
+        try:
+            entities = ner(text[:512])
+            for ent in entities:
+                if ent["entity_group"] == "PER":
+                    return ent["word"]
+        except Exception:
+            pass
+    # spaCy fallback
+    doc = nlp(text[:300])
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            return ent.text
+    # last fallback: first non-empty line
+    for line in text.strip().split('\n'):
+        line = line.strip()
+        if line and len(line) < 60 and not re.search(r'@|http|resume|cv', line, re.IGNORECASE):
+            return line
+    return "Unknown"
+
+
+def analyze_resume(text: str, jd_text: str = None) -> dict:
     skills = extract_skills(text)
     experience = extract_experience_years(text)
     education = extract_education(text)
@@ -194,6 +251,8 @@ def analyze_resume(text: str) -> dict:
     score = compute_score(skills, experience, education)
     ats_score = get_ats_score(text, skills)
     categorized = categorize_skills(skills)
+    sections = get_section_checklist(text)
+    jd_match = match_job_description(skills, jd_text) if jd_text else None
 
     return {
         "name": name,
@@ -211,5 +270,7 @@ def analyze_resume(text: str) -> dict:
         "resume_score": score,
         "ats_score": ats_score,
         "suggestions": suggestions,
+        "section_checklist": sections,
+        "jd_match": jd_match,
         "word_count": len(text.split()),
     }

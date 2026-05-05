@@ -1,5 +1,4 @@
-// Auto-detect: use env variable if set (for production), else localhost
-const API_BASE = window._ENV_API_URL || "http://localhost:8000";
+const API_BASE = (window._ENV_API_URL || "http://localhost:8000").replace(/\/$/, "");
 
 let currentTab = 'file';
 let selectedFile = null;
@@ -13,23 +12,15 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
 }
 
-// File drag & drop
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
-
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
 dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file) setFile(file);
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
 });
-
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) setFile(fileInput.files[0]);
-});
-
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
 function setFile(file) {
   selectedFile = file;
   document.getElementById('fileName').textContent = '✓ ' + file.name;
@@ -42,6 +33,7 @@ async function analyzeResume() {
   btn.disabled = true;
   spinner.classList.remove('hidden');
   document.getElementById('results').classList.add('hidden');
+  const jdText = document.getElementById('jdInput').value.trim();
 
   try {
     let data;
@@ -49,16 +41,17 @@ async function analyzeResume() {
       if (!selectedFile) throw new Error('Please select a resume file first.');
       const form = new FormData();
       form.append('file', selectedFile);
+      if (jdText) form.append('jd_text', jdText);
       const res = await fetch(`${API_BASE}/analyze/file`, { method: 'POST', body: form });
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Analysis failed'); }
       data = await res.json();
     } else {
       const text = document.getElementById('textInput').value.trim();
-      if (!text || text.length < 50) throw new Error('Please paste your full resume text (at least 50 characters).');
+      if (!text || text.length < 50) throw new Error('Please paste your full resume text.');
       const res = await fetch(`${API_BASE}/analyze/text`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, jd_text: jdText || null })
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Analysis failed'); }
       data = await res.json();
@@ -82,9 +75,30 @@ function renderResults(data) {
   document.getElementById('predictedRole').textContent = data.predicted_role || '-';
   document.getElementById('wordCount').textContent = (data.word_count || 0) + ' words';
 
+  // JD Match
+  const jdCard = document.getElementById('jdMatchCard');
+  if (data.jd_match) {
+    jdCard.style.display = 'block';
+    const jd = data.jd_match;
+    document.getElementById('jdMatchContent').innerHTML = `
+      <div class="jd-match-score">${jd.match_score}%</div>
+      <div class="jd-match-sub">Matched ${jd.matched_skills.length} of ${jd.jd_skills_total} skills from the job description</div>
+      ${jd.matched_skills.length ? `<div class="jd-tag-label">✅ Matched</div><div class="jd-tags">${jd.matched_skills.map(s => `<span class="jd-tag-matched">${s}</span>`).join('')}</div>` : ''}
+      ${jd.missing_skills.length ? `<div class="jd-tag-label">❌ Missing</div><div class="jd-tags">${jd.missing_skills.map(s => `<span class="jd-tag-missing">${s}</span>`).join('')}</div>` : ''}
+    `;
+  } else {
+    jdCard.style.display = 'none';
+  }
+
+  // Section Checklist
+  const sections = data.section_checklist || {};
+  document.getElementById('sectionChecklist').innerHTML = Object.entries(sections).map(([name, present]) =>
+    `<div class="check-item ${present ? 'yes' : 'no'}">${present ? '✅' : '❌'} ${name}</div>`
+  ).join('');
+
+  // Contact Info
   const contact = data.contact || {};
-  const infoGrid = document.getElementById('contactInfo');
-  infoGrid.innerHTML = `
+  document.getElementById('contactInfo').innerHTML = `
     <div class="info-item"><strong>Name:</strong> ${data.name || 'N/A'}</div>
     <div class="info-item"><strong>Email:</strong> ${contact.email || 'N/A'}</div>
     <div class="info-item"><strong>Phone:</strong> ${contact.phone || 'N/A'}</div>
@@ -93,47 +107,32 @@ function renderResults(data) {
     <div class="info-item"><strong>Experience:</strong> ${data.experience_years ? data.experience_years + ' year(s)' : 'Not specified'}</div>
   `;
 
-  const catColors = {
-    'Languages': 'lang', 'Frontend': 'frontend', 'Backend': 'backend',
-    'ML/AI': 'ml', 'Databases': 'db', 'DevOps/Cloud': 'devops',
-    'Data Tools': 'data', 'Tools': 'tools'
-  };
-  const skillsGrid = document.getElementById('skillsGrid');
+  // Skills
+  const catColors = { 'Languages':'lang','Frontend':'frontend','Backend':'backend','ML/AI':'ml','Databases':'db','DevOps/Cloud':'devops','Data Tools':'data','Tools':'tools' };
   const cats = data.skills_by_category || {};
-  if (Object.keys(cats).length === 0) {
-    skillsGrid.innerHTML = '<p style="color:var(--text-muted);font-size:0.88rem">No recognizable tech skills found. Please include skill keywords.</p>';
-  } else {
-    skillsGrid.innerHTML = Object.entries(cats).map(([cat, skills]) => `
-      <div class="skill-cat">
-        <div class="skill-cat-name">${cat}</div>
-        <div class="skill-tags">
-          ${skills.map(s => `<span class="skill-tag ${catColors[cat] || 'tools'}">${s}</span>`).join('')}
-        </div>
-      </div>
-    `).join('');
-  }
+  document.getElementById('skillsGrid').innerHTML = Object.keys(cats).length === 0
+    ? '<p style="color:var(--text-muted);font-size:0.88rem">No skills found.</p>'
+    : Object.entries(cats).map(([cat, skills]) => `
+        <div class="skill-cat">
+          <div class="skill-cat-name">${cat}</div>
+          <div class="skill-tags">${skills.map(s => `<span class="skill-tag ${catColors[cat]||'tools'}">${s}</span>`).join('')}</div>
+        </div>`).join('');
 
-  document.getElementById('experienceInfo').innerHTML =
-    data.experience_years > 0
-      ? `<span style="font-size:1.5rem;font-weight:700;color:var(--primary)">${data.experience_years}</span> year(s) detected`
-      : 'Experience duration not found. Add it explicitly.';
-
+  // Experience & Education
+  document.getElementById('experienceInfo').innerHTML = data.experience_years > 0
+    ? `<span style="font-size:1.5rem;font-weight:700;color:var(--primary)">${data.experience_years}</span> year(s) detected`
+    : 'Not found. Add experience duration explicitly.';
   const edu = data.education || [];
-  document.getElementById('educationInfo').innerHTML =
-    edu.length > 0
-      ? edu.map(e => `<div style="color:var(--success);font-weight:600">${e}</div>`).join('')
-      : 'No degree/education keywords found.';
+  document.getElementById('educationInfo').innerHTML = edu.length > 0
+    ? edu.map(e => `<div style="color:var(--success);font-weight:600">${e}</div>`).join('')
+    : 'No education keywords found.';
 
+  // Suggestions
   const sugIcons = { skill: '🛠️', content: '📝', link: '🔗' };
   const sugs = data.suggestions || [];
-  document.getElementById('suggestionsList').innerHTML =
-    sugs.length === 0
-      ? '<p style="color:var(--success);font-weight:500">✅ Great resume! No major improvements needed.</p>'
-      : sugs.map(s => `
-          <div class="suggestion-item ${s.type || 'content'}">
-            <span class="suggestion-icon">${sugIcons[s.type] || '💡'}</span>
-            <span>${s.msg}</span>
-          </div>`).join('');
+  document.getElementById('suggestionsList').innerHTML = sugs.length === 0
+    ? '<p style="color:var(--success);font-weight:500">✅ Great resume! No major improvements needed.</p>'
+    : sugs.map(s => `<div class="suggestion-item ${s.type||'content'}"><span class="suggestion-icon">${sugIcons[s.type]||'💡'}</span><span>${s.msg}</span></div>`).join('');
 
   document.getElementById('results').classList.remove('hidden');
   document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
@@ -150,11 +149,5 @@ function animateScore(id, target) {
   }, 25);
 }
 
-function showError(msg) {
-  const el = document.getElementById('errorMsg');
-  el.textContent = '⚠️ ' + msg;
-  el.classList.remove('hidden');
-}
-function hideError() {
-  document.getElementById('errorMsg').classList.add('hidden');
-}
+function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = '⚠️ ' + msg; el.classList.remove('hidden'); }
+function hideError() { document.getElementById('errorMsg').classList.add('hidden'); }
