@@ -1,4 +1,5 @@
-const API_BASE = "http://localhost:8000";
+// Auto-detect: use env variable if set (for production), else localhost
+const API_BASE = window._ENV_API_URL || "http://localhost:8000";
 
 let currentTab = 'file';
 let selectedFile = null;
@@ -72,7 +73,6 @@ async function analyzeResume() {
 }
 
 function renderResults(data) {
-  // Scores
   animateScore('resumeScore', data.resume_score);
   animateScore('atsScore', data.ats_score);
   setTimeout(() => {
@@ -82,7 +82,6 @@ function renderResults(data) {
   document.getElementById('predictedRole').textContent = data.predicted_role || '-';
   document.getElementById('wordCount').textContent = (data.word_count || 0) + ' words';
 
-  // Contact
   const contact = data.contact || {};
   const infoGrid = document.getElementById('contactInfo');
   infoGrid.innerHTML = `
@@ -94,7 +93,6 @@ function renderResults(data) {
     <div class="info-item"><strong>Experience:</strong> ${data.experience_years ? data.experience_years + ' year(s)' : 'Not specified'}</div>
   `;
 
-  // Skills by category
   const catColors = {
     'Languages': 'lang', 'Frontend': 'frontend', 'Backend': 'backend',
     'ML/AI': 'ml', 'Databases': 'db', 'DevOps/Cloud': 'devops',
@@ -115,7 +113,6 @@ function renderResults(data) {
     `).join('');
   }
 
-  // Experience & Education
   document.getElementById('experienceInfo').innerHTML =
     data.experience_years > 0
       ? `<span style="font-size:1.5rem;font-weight:700;color:var(--primary)">${data.experience_years}</span> year(s) detected`
@@ -127,7 +124,6 @@ function renderResults(data) {
       ? edu.map(e => `<div style="color:var(--success);font-weight:600">${e}</div>`).join('')
       : 'No degree/education keywords found.';
 
-  // Suggestions
   const sugIcons = { skill: '🛠️', content: '📝', link: '🔗' };
   const sugs = data.suggestions || [];
   document.getElementById('suggestionsList').innerHTML =

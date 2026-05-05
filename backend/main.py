@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import pdfplumber
 import docx
 import io
+import os
 from analyzer import analyze_resume
 
 app = FastAPI(
@@ -12,9 +13,18 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Allow requests from Vercel frontend and localhost
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "https://*.vercel.app",
+    "https://predict-resume.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Change to ALLOWED_ORIGINS after getting your Vercel URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,10 +63,6 @@ def analyze_text(request: TextRequest):
 
 @app.post("/analyze/file")
 async def analyze_file(file: UploadFile = File(...)):
-    allowed_types = ["application/pdf",
-                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                     "text/plain"]
-
     content = await file.read()
 
     if file.filename.endswith(".pdf"):

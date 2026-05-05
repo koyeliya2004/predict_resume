@@ -24,21 +24,18 @@
   </header>
 
   <main>
-    <!-- Hero -->
     <section class="hero">
       <div class="badge">Powered by BERT + spaCy NLP</div>
       <h1>Analyze Your Resume <br/><span class="gradient-text">with AI Precision</span></h1>
       <p class="hero-sub">Get instant feedback on skills, ATS score, role prediction, and actionable improvements based on real NLP analysis.</p>
     </section>
 
-    <!-- Upload Section -->
     <section class="upload-section">
       <div class="tab-bar">
         <button class="tab active" onclick="switchTab('file')">📁 Upload File</button>
         <button class="tab" onclick="switchTab('text')">📝 Paste Text</button>
       </div>
 
-      <!-- File Upload -->
       <div id="tab-file" class="tab-content active">
         <div class="drop-zone" id="dropZone">
           <div class="drop-icon">📄</div>
@@ -52,7 +49,6 @@
         </div>
       </div>
 
-      <!-- Text Input -->
       <div id="tab-text" class="tab-content">
         <textarea id="textInput" placeholder="Paste your full resume text here...\n\nInclude your skills, experience, education, and projects for best analysis."></textarea>
       </div>
@@ -62,11 +58,9 @@
       <div id="errorMsg" class="error-msg hidden"></div>
     </section>
 
-    <!-- Results -->
     <section id="results" class="results hidden">
       <h2 class="results-title">Analysis Results</h2>
 
-      <!-- Score Cards -->
       <div class="score-grid">
         <div class="score-card">
           <div class="score-label">Resume Score</div>
@@ -88,19 +82,16 @@
         </div>
       </div>
 
-      <!-- Name & Contact -->
       <div class="info-card">
         <h3>👤 Candidate Info</h3>
         <div class="info-grid" id="contactInfo"></div>
       </div>
 
-      <!-- Skills by Category -->
       <div class="info-card">
         <h3>🛠️ Skills Detected</h3>
         <div id="skillsGrid" class="skills-grid"></div>
       </div>
 
-      <!-- Experience & Education -->
       <div class="two-col">
         <div class="info-card">
           <h3>💼 Experience</h3>
@@ -112,7 +103,6 @@
         </div>
       </div>
 
-      <!-- Suggestions -->
       <div class="info-card">
         <h3>💡 Improvement Suggestions</h3>
         <div id="suggestionsList"></div>
@@ -124,6 +114,8 @@
     <p>Built with FastAPI + BERT + spaCy | <a href="https://github.com/koyeliya2004/predict_resume" target="_blank">GitHub</a></p>
   </footer>
 
+  <!-- Load env config BEFORE app.js -->
+  <script src="env.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
